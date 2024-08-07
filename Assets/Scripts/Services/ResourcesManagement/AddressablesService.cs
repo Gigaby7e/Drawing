@@ -24,9 +24,6 @@ namespace Services.ResourcesManagement
             return handle.Status == AsyncOperationStatus.Succeeded ? handle.Result : null;
         }
 
-        public void ReleaseResource(string address)
-        {
-            throw new System.NotImplementedException();
-        }
+        public void ReleaseResource(string address) => Addressables.Release(address);
     }
 }

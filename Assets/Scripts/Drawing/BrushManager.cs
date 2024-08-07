@@ -12,7 +12,8 @@ namespace Drawing
         {
             _brushController = brushController;
 
-            Subscribe();
+            _brushController.SizeChanged += OnSizeChanged;
+            _brushController.ColorChanged += OnColorChanged;
         }
 
         private void OnColorChanged(Color color) => DrawingEvents.BrushColorChanged(color);
@@ -20,16 +21,5 @@ namespace Drawing
         private void OnSizeChanged(float size) => DrawingEvents.BrushSizeChanged(size);
 
         public void Tick() => _brushController.PickColorFromPalette();
-
-        private void Subscribe()
-        {
-            _brushController.SizeChanged += OnSizeChanged;
-            _brushController.ColorChanged += OnColorChanged;
-        }
-        
-        private void Unsubscribe()
-        {
-            _brushController.SizeChanged -= OnSizeChanged;
-            _brushController.ColorChanged -= OnColorChanged;
-        }}
+    }
 }

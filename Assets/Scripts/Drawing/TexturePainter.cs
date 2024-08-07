@@ -8,37 +8,41 @@ namespace Drawing
         private const string BrushPos = "_BrushPos";
         private const string BrushSize = "_BrushSize";
         private const string BrushColor = "_BrushColor";
+        private const int TextureWidth = 512;
+        private const int TextureHeight = 512;
     
         [SerializeField] private Shader brushShader;
         [SerializeField] private float brushSize = 1f;
         [SerializeField] private Color brushColor = Color.red;
         [SerializeField] private RenderTexture renderTexture;
+        [SerializeField] private float steps = 0;
 
-        private Camera cam;
-        private Material brushMaterial;
-        private RenderTexture tempRenderTexture;
-        private Vector2 lastUV;
-        private bool isPainting = false;
-    
+        private Camera _cam;
+        private Material _brushMaterial;
+        private RenderTexture _tempRenderTexture;
+        private Vector2 _lastUV;
+        private bool _isPainting = false;
+        private float _drawingSharpness = 100;
+        
         private ISaveLoadService _saveLoadService;
 
         private void Start()
         {
-            cam = Camera.main;
+            _cam = Camera.main;
         
             if (renderTexture == null)
             {
-                renderTexture = new RenderTexture(512, 512, 0, RenderTextureFormat.ARGB32);
+                renderTexture = new RenderTexture(TextureWidth, TextureHeight, 0, RenderTextureFormat.ARGB32);
                 renderTexture.Create();
             }
         
             OnClearTexture();
 
-            brushMaterial = new Material(brushShader);
-            brushMaterial.SetColor(BrushColor, brushColor);
+            _brushMaterial = new Material(brushShader);
+            _brushMaterial.SetColor(BrushColor, brushColor);
 
-            tempRenderTexture = new RenderTexture(renderTexture.width, renderTexture.height, 0, RenderTextureFormat.ARGB32);
-            tempRenderTexture.Create();
+            _tempRenderTexture = new RenderTexture(renderTexture.width, renderTexture.height, 0, RenderTextureFormat.ARGB32);
+            _tempRenderTexture.Create();
 
             GetComponent<Renderer>().material.mainTexture = renderTexture;
         }
@@ -47,7 +51,7 @@ namespace Drawing
         {
             if (Input.GetMouseButton(0))
             {
-                Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+                Ray ray = _cam.ScreenPointToRay(Input.mousePosition);
 
                 if (Physics.Raycast(ray, out RaycastHit hit))
                 {
@@ -60,59 +64,68 @@ namespace Drawing
                         {
                             Vector2 uv = hit.textureCoord;
 
-                            if (!isPainting)
+                            if (!_isPainting)
                             {
-                                lastUV = uv;
-                                isPainting = true;
+                                _lastUV = uv;
+                                _isPainting = true;
 
                                 DrawCircle(uv);
                             }
                             else
                             {
-                                DrawLine(lastUV, uv);
-                                lastUV = uv;
+                                DrawLine(_lastUV, uv);
+                                _lastUV = uv;
                             }
                         }
                     }
                 }
             }
-            else if (isPainting)
+            else if (_isPainting)
             {
-                isPainting = false;
+                _isPainting = false;
             }
         }
+        
+        public void Initialize(ISaveLoadService saveLoadService)
+        {
+            _saveLoadService = saveLoadService;
+        
+            DrawingEvents.SaveDrawingProgress += OnSaveTexture;
+            DrawingEvents.LoadDrawingProgress += OnLoadedTexture;
+            DrawingEvents.ClearDrawingProgress += OnClearTexture;
+        }
+        
+        public void SetBrushSize(float size)
+        {
+            brushSize = size;
+            _brushMaterial.SetFloat(BrushSize, brushSize);
+        }
 
+        public void SetBrushColor(Color color)
+        {
+            brushColor = color;
+            _brushMaterial.SetColor(BrushColor, brushColor);
+        }
+        
         private void DrawLine(Vector2 start, Vector2 end)
         {
-            float distance = Vector2.Distance(start, end);
-            int steps = Mathf.CeilToInt(distance / (brushSize / renderTexture.width));
+            var distance = Vector2.Distance(start, end);
+            steps = Mathf.CeilToInt(distance / (brushSize / renderTexture.width)) / _drawingSharpness;
 
-            for (int i = 0; i <= steps; i++)
+            for (var i = 0; i <= steps; i++)
             {
-                Vector2 interpolated = Vector2.Lerp(start, end, (float)i / steps);
+                var interpolated = Vector2.Lerp(start, end, (float)i / steps);
                 DrawCircle(interpolated);
             }
         }
 
         private void DrawCircle(Vector2 uv)
         {
-            brushMaterial.SetVector(BrushPos, new Vector4(uv.x, uv.y, 0, 0));
-            brushMaterial.SetFloat(BrushSize, brushSize);
+            _brushMaterial.SetVector(BrushPos, new Vector4(uv.x, uv.y, 0, 0));
+            _brushMaterial.SetFloat(BrushSize, brushSize);
 
-            Graphics.Blit(renderTexture, tempRenderTexture, brushMaterial);
-            Graphics.Blit(tempRenderTexture, renderTexture);
-        }
-
-        public void SetBrushSize(float size)
-        {
-            brushSize = size;
-            brushMaterial.SetFloat(BrushSize, brushSize);
-        }
-
-        public void SetBrushColor(Color color)
-        {
-            brushColor = color;
-            brushMaterial.SetColor(BrushColor, brushColor);
+            Graphics.Blit(renderTexture, _tempRenderTexture, _brushMaterial);
+            Graphics.Blit(_tempRenderTexture, renderTexture);
         }
 
         private void OnSaveTexture()
@@ -142,15 +155,5 @@ namespace Drawing
         
             RenderTexture.active = null;
         }
-
-        public void Initialize(ISaveLoadService saveLoadService)
-        {
-            _saveLoadService = saveLoadService;
-        
-            DrawingEvents.SaveDrawingProgress += OnSaveTexture;
-            DrawingEvents.LoadDrawingProgress += OnLoadedTexture;
-            DrawingEvents.ClearDrawingProgress += OnClearTexture;
-        }
-
     }
 }
